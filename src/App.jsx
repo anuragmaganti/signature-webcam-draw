@@ -17,22 +17,18 @@ function App() {
   const [modelReady, setModelReady] = useState(false);
   const [handDetected, setHandDetected] = useState(false);
 
+  const strokesRef = useRef([]);
+  const currentStrokeRef = useRef([]);
+
 
   function clearCanvas() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
 
-  function saveCanvas() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const url = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "handtrack-draw.png";
-    a.click();
+    strokesRef.current = [];
+    currentStrokeRef.current = [];
   }
 
   useEffect (()=> {
@@ -109,6 +105,9 @@ function App() {
         const midX = ((thumbTip.x + indexTip.x) / 2) * canvas.width;
         const midY = ((thumbTip.y + indexTip.y) / 2) * canvas.height;
 
+        const drawX = canvas.width - midX;
+        const drawY = midY;
+
         const ctx = canvas.getContext("2d");
 
         ctx.lineWidth = 2;
@@ -118,13 +117,25 @@ function App() {
         if (isPinchingRef.current) {
           if (!isDrawingRef.current) {
             isDrawingRef.current = true;
+
+            // NEW: start a new stroke
+            currentStrokeRef.current = [{ x: drawX, y: drawY }];
+
             ctx.beginPath();
-            ctx.moveTo(midX, midY);
+            ctx.moveTo(drawX, drawY);
           } else {
-            ctx.lineTo(midX, midY);
+            // NEW: add point to current stroke
+            currentStrokeRef.current.push({ x: drawX, y: drawY });
+
+            ctx.lineTo(drawX, drawY);
             ctx.stroke();
           }
-        } else {
+          } else {
+          // NEW: finish stroke
+          if (isDrawingRef.current && currentStrokeRef.current.length > 0) {
+            strokesRef.current.push(currentStrokeRef.current);
+            currentStrokeRef.current = [];
+          }
           isDrawingRef.current = false;
         }
       }
@@ -148,6 +159,11 @@ function App() {
 
   function stopCamera() {
 
+    if (currentStrokeRef.current.length > 0) {
+    strokesRef.current.push(currentStrokeRef.current);
+    currentStrokeRef.current = [];
+    }
+
     if (rafId.current) {
       cancelAnimationFrame(rafId.current);
       rafId.current = null;
@@ -169,13 +185,52 @@ function App() {
     setCameraOn(false);
   }
 
+  function exportSignatureAsSVG() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const paths = strokesRef.current.map(stroke => {
+      return stroke.map((p, i) =>
+          i === 0
+            ? `M ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+            : `L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+          ) .join(" ");
+    });
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 ${width} ${height}"
+      width="${width}"
+      height="${height}">
+    ${paths.map(d =>
+      `<path d="${d}"
+        stroke="black"
+        stroke-width="2"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round" />`
+      ).join("\n")} </svg>`.trim();
+
+    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "signature.svg";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">
           <div className="logo" />
           <div>
-            <div className="title">Handtrack Draw</div>
+            <div className="title">Draw your signature with your webcam</div>
             <div className="subtitle">Pinch to draw • Release to lift</div>
           </div>
         </div>
@@ -195,9 +250,10 @@ function App() {
             Clear
           </button>
 
-          <button className="btn" onClick={saveCanvas} disabled={!cameraOn}>
-            Save
+          <button className="btn" onClick={exportSignatureAsSVG} disabled={!cameraOn}>
+            Export SVG
           </button>
+
         </div>
       </header>
 
@@ -225,7 +281,7 @@ function App() {
           <canvas
             ref={canvasRef}
             className="ink"
-            style={{ transform: "scaleX(-1)" }}
+
           />
         </section>
 

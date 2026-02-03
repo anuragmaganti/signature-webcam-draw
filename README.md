@@ -1,6 +1,6 @@
-Handtrack Draw
+Signature Webcam Draw
 
-Handtrack Draw is a gesture-based drawing app that lets users draw on a canvas using only their hand.
+Signature Webcam Draw is a gesture-based drawing app that lets users draw thier signature on a canvas using only their hand and export it as a PNG.
 A pinch gesture (thumb + index finger) is interpreted as pen down / pen up in real time using webcam input.
 
 What it does
@@ -8,7 +8,7 @@ What it does
 - Tracks hand landmarks from a live webcam feed
 - Detects a pinch gesture to start and stop drawing
 - Draws directly onto an HTML canvas
-- Allows clearing the canvas and exporting drawings as PNGs
+- Allows clearing the canvas and exporting drawings as SVG
 
 How it works
 

@@ -1,16 +1,34 @@
-# React + Vite
+Handtrack Draw
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Handtrack Draw is a gesture-based drawing app that lets users draw on a canvas using only their hand.
+A pinch gesture (thumb + index finger) is interpreted as pen down / pen up in real time using webcam input.
 
-Currently, two official plugins are available:
+What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Tracks hand landmarks from a live webcam feed
+- Detects a pinch gesture to start and stop drawing
+- Draws directly onto an HTML canvas
+- Allows clearing the canvas and exporting drawings as PNGs
 
-## React Compiler
+How it works
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Each video frame is processed using MediaPipe Hands
+- The distance between thumb tip (landmark 4) and index tip (landmark 8) is measured
+- When the distance crosses a threshold, drawing starts or stops
+- Drawing coordinates are mapped directly to the canvas using normalized landmarks
 
-## Expanding the ESLint configuration
+Technical highlights
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Uses requestAnimationFrame for frame-accurate processing
+- Stores gesture state in refs to avoid unnecessary React re-renders
+- Applies hysteresis thresholds to stabilize pinch detection
+- Synchronizes canvas resolution with video resolution to avoid distortion
+
+Tech stack
+
+- React
+- MediaPipe Tasks Vision
+- HTML Canvas
+- WebRTC (getUserMedia)
+
+Built with Codex to explore real-time gesture input, performance-aware React patterns, and canvas rendering.

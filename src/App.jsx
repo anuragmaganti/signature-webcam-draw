@@ -49,14 +49,14 @@ function App() {
       const canvas = canvasRef.current;
       const handLandmarker = handLandmarkerRef.current;
 
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      }
-
       if (!video || video.readyState < 2) {
         rafId.current = requestAnimationFrame(loop);
         return;
+      }
+
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
       }
 
       if (video.currentTime !== lastVideoTime) {
@@ -67,7 +67,51 @@ function App() {
           performance.now()
         );
 
-        setHandDetected(result.landmarks.length > 0);
+        const hasHand = result.landmarks.length > 0;
+        setHandDetected(hasHand);
+
+        if (!hasHand) {
+          isPinchingRef.current = false;
+          isDrawingRef.current = false;
+          rafId.current = requestAnimationFrame(loop);
+        }
+
+        const lm = result.landmarks[0]; // numHands: 1
+        const thumbTip = lm[4];
+        const indexTip = lm[8];
+
+        const dx = thumbTip.x - indexTip.x;
+        const dy = thumbTip.y - indexTip.y;
+        const dist = Math.hypot(dx, dy);
+
+        // hysteresis thresholds (tune later)
+        const PINCH_ON = 0.045;
+        const PINCH_OFF = 0.06;
+
+        if (!isPinchingRef.current && dist < PINCH_ON) isPinchingRef.current = true;
+        if (isPinchingRef.current && dist > PINCH_OFF) isPinchingRef.current = false;
+
+        const midX = ((thumbTip.x + indexTip.x) / 2) * canvas.width;
+        const midY = ((thumbTip.y + indexTip.y) / 2) * canvas.height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "red";
+
+        if (isPinchingRef.current) {
+          if (!isDrawingRef.current) {
+            isDrawingRef.current = true;
+            ctx.beginPath();
+            ctx.moveTo(midX, midY);
+          } else {
+            ctx.lineTo(midX, midY);
+            ctx.stroke();
+          }
+        } else {
+          isDrawingRef.current = false;
+        }
+
       }
 
     rafId.current = requestAnimationFrame(loop);
@@ -97,6 +141,9 @@ function App() {
 
     setHandDetected(false);
 
+    isPinchingRef.current = false;
+    isDrawingRef.current = false;
+
     const video = videoRef.current;
     const stream = video?.srcObject;
 
@@ -124,7 +171,7 @@ function App() {
         <span>Hand: {handDetected ? "detected" : "no hand detected"}</span>
       </div>
 
-      <canvas ref={canvasRef} style={{background: "gray", height: "100%", width: "100%", transform: "scaleX(-1)"}}></canvas>
+      <canvas ref={canvasRef} style={{background: "black", height: "100%", width: "100%", transform: "scaleX(-1)"}}></canvas>
 
 
     </div>

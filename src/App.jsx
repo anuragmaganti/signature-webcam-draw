@@ -10,6 +10,8 @@ function App() {
   const videoRef = useRef(null);
   const rafId = useRef(null);
   const canvasRef = useRef(null);
+  const isPinchingRef = useRef(false);
+  const isDrawingRef = useRef(false);
 
   const [cameraOn , setCameraOn] = useState(false);
   const [modelReady, setModelReady] = useState(false);
@@ -44,7 +46,13 @@ function App() {
 
     const loop = () => {
       const video = videoRef.current;
+      const canvas = canvasRef.current;
       const handLandmarker = handLandmarkerRef.current;
+
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
 
       if (!video || video.readyState < 2) {
         rafId.current = requestAnimationFrame(loop);

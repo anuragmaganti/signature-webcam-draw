@@ -8,12 +8,13 @@ function App() {
 
   const handLandmarkerRef = useRef(null);
   const videoRef = useRef(null);
-  const intervalRef = useRef(null);
+  const rafId = useRef(null);
   const canvasRef = useRef(null);
 
   const [cameraOn , setCameraOn] = useState(false);
   const [modelReady, setModelReady] = useState(false);
   const [handDetected, setHandDetected] = useState(false);
+
 
   useEffect (()=> {
     async function init() {
@@ -38,16 +39,35 @@ function App() {
 
   }, []);
 
-  function startDetectionInterval() {
-    const video = videoRef.current;
-    const landmarker = handLandmarkerRef.current;
+  function startDetectionLoop() {
+    let lastVideoTime = -1;
 
-    return setInterval(() => {
-      const result = landmarker.detectForVideo(video, performance.now());
-      setHandDetected(result.landmarks.length > 0);
-    }, 200);
+    const loop = () => {
+      const video = videoRef.current;
+      const handLandmarker = handLandmarkerRef.current;
 
-  }
+      if (!video || video.readyState < 2) {
+        rafId.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      if (video.currentTime !== lastVideoTime) {
+        lastVideoTime = video.currentTime;
+
+        const result = handLandmarker.detectForVideo(
+          video,
+          performance.now()
+        );
+
+        setHandDetected(result.landmarks.length > 0);
+      }
+
+    rafId.current = requestAnimationFrame(loop);
+
+  };
+
+  rafId.current = requestAnimationFrame(loop);
+}
 
   async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia( {video:true});
@@ -57,14 +77,14 @@ function App() {
     await video.play();
 
     setCameraOn(true)
-    intervalRef.current = startDetectionInterval();
+    startDetectionLoop();
   }
 
   function stopCamera() {
 
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (rafId.current) {
+      cancelAnimationFrame(rafId.current);
+     rafId.current = null;
     }
 
     setHandDetected(false);
@@ -96,7 +116,7 @@ function App() {
         <span>Hand: {handDetected ? "detected" : "no hand detected"}</span>
       </div>
 
-      <canvas ref={canvasRef} style={{background: "gray", transform: "scaleX(-1)", width: "500px", height: "500px"}}></canvas>
+      <canvas ref={canvasRef} style={{background: "gray", height: "100%", width: "100%", transform: "scaleX(-1)"}}></canvas>
 
 
     </div>

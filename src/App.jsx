@@ -18,9 +18,25 @@ function App() {
   const [handDetected, setHandDetected] = useState(false);
 
 
+  function clearCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function saveCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "handtrack-draw.png";
+    a.click();
+  }
+
   useEffect (()=> {
     async function init() {
-
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm"
       );
@@ -34,11 +50,9 @@ function App() {
       handLandmarkerRef.current = handLandmarker;
       console.log("HandLandmarker ready");
       setModelReady(true);
-
     }
 
     init();
-
   }, []);
 
   function startDetectionLoop() {
@@ -49,7 +63,7 @@ function App() {
       const canvas = canvasRef.current;
       const handLandmarker = handLandmarkerRef.current;
 
-      if (!video || video.readyState < 2) {
+      if (!video || !canvas || !handLandmarker || video.readyState < 2) {
         rafId.current = requestAnimationFrame(loop);
         return;
       }
@@ -74,9 +88,10 @@ function App() {
           isPinchingRef.current = false;
           isDrawingRef.current = false;
           rafId.current = requestAnimationFrame(loop);
+          return;
         }
 
-        const lm = result.landmarks[0]; // numHands: 1
+        const lm = result.landmarks[0];
         const thumbTip = lm[4];
         const indexTip = lm[8];
 
@@ -84,7 +99,7 @@ function App() {
         const dy = thumbTip.y - indexTip.y;
         const dist = Math.hypot(dx, dy);
 
-        // hysteresis thresholds (tune later)
+
         const PINCH_ON = 0.045;
         const PINCH_OFF = 0.06;
 
@@ -95,9 +110,10 @@ function App() {
         const midY = ((thumbTip.y + indexTip.y) / 2) * canvas.height;
 
         const ctx = canvas.getContext("2d");
-        ctx.lineWidth = 4;
+
+        ctx.lineWidth = 2;
         ctx.lineCap = "round";
-        ctx.strokeStyle = "red";
+        ctx.strokeStyle = "white";
 
         if (isPinchingRef.current) {
           if (!isDrawingRef.current) {
@@ -111,15 +127,13 @@ function App() {
         } else {
           isDrawingRef.current = false;
         }
-
       }
 
+      rafId.current = requestAnimationFrame(loop);
+    };
+
     rafId.current = requestAnimationFrame(loop);
-
-  };
-
-  rafId.current = requestAnimationFrame(loop);
-}
+  }
 
   async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia( {video:true});
@@ -136,7 +150,7 @@ function App() {
 
     if (rafId.current) {
       cancelAnimationFrame(rafId.current);
-     rafId.current = null;
+      rafId.current = null;
     }
 
     setHandDetected(false);
@@ -156,28 +170,87 @@ function App() {
   }
 
   return (
-    <div>
-      <video ref={videoRef} muted playsInline style={{background:"black", objectFit: "cover", transform: "scaleX(-1)"}}></video>
-      <div>
-      {!cameraOn ? (
-          <button onClick={startCamera} disabled={!modelReady}>
-            Start Camera
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <div className="logo" />
+          <div>
+            <div className="title">Handtrack Draw</div>
+            <div className="subtitle">Pinch to draw • Release to lift</div>
+          </div>
+        </div>
+
+        <div className="actions">
+          {!cameraOn ? (
+            <button className="btn primary" onClick={startCamera} disabled={!modelReady}>
+              Start
+            </button>
+          ) : (
+            <button className="btn" onClick={stopCamera}>
+              Stop
+            </button>
+          )}
+
+          <button className="btn" onClick={clearCanvas} disabled={!cameraOn}>
+            Clear
           </button>
-        ) : (
-          <button onClick={stopCamera}>Stop Camera</button>
-        )}
-        <span>Model: {modelReady ? "ready" : "loading"}</span>
-        <br></br>
-        <span>Hand: {handDetected ? "detected" : "no hand detected"}</span>
-      </div>
 
-      <canvas ref={canvasRef} style={{background: "black", height: "100%", width: "100%", transform: "scaleX(-1)"}}></canvas>
+          <button className="btn" onClick={saveCanvas} disabled={!cameraOn}>
+            Save
+          </button>
+        </div>
+      </header>
+
+      <main className="content">
+        <section className="stage">
+          <div className="hud">
+            <span className={`pill ${modelReady ? "ok" : ""}`}>
+              Model {modelReady ? "Ready" : "Loading"}
+            </span>
+            <span className={`pill ${handDetected ? "ok" : ""}`}>
+              Hand {handDetected ? "Detected" : "Not found"}
+            </span>
+          </div>
 
 
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            className="pip"
+            style={{ transform: "scaleX(-1)" }}
+          />
+
+        
+          <canvas
+            ref={canvasRef}
+            className="ink"
+            style={{ transform: "scaleX(-1)" }}
+          />
+        </section>
+
+        <aside className="panel">
+          <div className="panelTitle">Controls</div>
+          <div className="panelRow">
+            <div className="label">Status</div>
+            <div className="value">
+              {modelReady ? "Model ready" : "Loading model…"} •{" "}
+              {handDetected ? "Hand detected" : "No hand"}
+            </div>
+          </div>
+
+          <div className="tips">
+            <div className="tipTitle">Tips</div>
+            <ul>
+              <li>Use bright lighting for more stable tracking.</li>
+              <li>Keep your hand within the camera frame.</li>
+              <li>Pinch thumb + index to draw.</li>
+            </ul>
+          </div>
+        </aside>
+      </main>
     </div>
   )
-
 }
-
 
 export default App

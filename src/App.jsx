@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 import logoMark from "./assets/webcam-sign-logo.svg";
+import quillCursorUrl from "./assets/quill-cursor.svg";
 
 const MODEL_URL = "/models/hand_landmarker.task";
 const MEDIAPIPE_VERSION = "0.10.32";
@@ -12,6 +13,10 @@ const EXPORT_STROKE_COLOR = "black";
 const CURSOR_RADIUS = 5;
 const CURSOR_IDLE_COLOR = "#2f7a5f";
 const CURSOR_DRAWING_COLOR = "#201a16";
+const CURSOR_QUILL_SIZE = 18;
+const CURSOR_QUILL_VIEWBOX_SIZE = 24;
+const CURSOR_QUILL_HOTSPOT_X = 20.7;
+const CURSOR_QUILL_HOTSPOT_Y = 6.1;
 const PINCH_ON_RATIO = 0.18;
 const PINCH_OFF_RATIO = 0.24;
 const PINCH_SMOOTHING = 0.45;
@@ -68,6 +73,7 @@ function App() {
   const hasSignatureRef = useRef(false);
   const interactionPhaseRef = useRef("loading-model");
   const cursorPointRef = useRef(null);
+  const quillCursorImageRef = useRef(null);
   const smoothedPinchRatioRef = useRef(null);
   const pinchReleaseFramesRef = useRef(0);
 
@@ -244,6 +250,30 @@ function App() {
     const point = cursorPointRef.current;
     if (!point || !handDetectedRef.current) return;
 
+    const quillCursorImage = quillCursorImageRef.current;
+    if (quillCursorImage) {
+      const drawX =
+        (-CURSOR_QUILL_HOTSPOT_X / CURSOR_QUILL_VIEWBOX_SIZE) *
+        CURSOR_QUILL_SIZE;
+      const drawY =
+        (-CURSOR_QUILL_HOTSPOT_Y / CURSOR_QUILL_VIEWBOX_SIZE) *
+        CURSOR_QUILL_SIZE;
+
+      ctx.save();
+      ctx.translate(point.x, point.y);
+      ctx.rotate(Math.PI);
+      ctx.globalAlpha = isPinchingRef.current ? 1 : 0.92;
+      ctx.drawImage(
+        quillCursorImage,
+        drawX,
+        drawY,
+        CURSOR_QUILL_SIZE,
+        CURSOR_QUILL_SIZE,
+      );
+      ctx.restore();
+      return;
+    }
+
     const cursorColor = isPinchingRef.current
       ? CURSOR_DRAWING_COLOR
       : CURSOR_IDLE_COLOR;
@@ -280,6 +310,23 @@ function App() {
     drawStroke(ctx, currentStrokeRef.current);
     drawCursor(ctx);
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    const image = new Image();
+
+    image.decoding = "async";
+    image.src = quillCursorUrl;
+    image.onload = () => {
+      if (cancelled) return;
+      quillCursorImageRef.current = image;
+    };
+
+    return () => {
+      cancelled = true;
+      quillCursorImageRef.current = null;
+    };
+  }, []);
 
   function getStrokePathData(stroke) {
     if (stroke.length === 0) return "";

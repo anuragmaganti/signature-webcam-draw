@@ -4,6 +4,8 @@ import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 import logoMark from "./assets/webcam-sign-logo.svg";
 
 const MODEL_URL = "/models/hand_landmarker.task";
+const MEDIAPIPE_VERSION = "0.10.32";
+const MEDIAPIPE_WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
 const STROKE_WIDTH = 2;
 const CANVAS_STROKE_COLOR = "#201a16";
 const EXPORT_STROKE_COLOR = "black";
@@ -14,6 +16,8 @@ const PINCH_ON_RATIO = 0.18;
 const PINCH_OFF_RATIO = 0.24;
 const PINCH_SMOOTHING = 0.45;
 const PINCH_RELEASE_GRACE_FRAMES = 3;
+const DRAWING_RELEASE_RATIO = 0.34;
+const DRAWING_RELEASE_GRACE_FRAMES = 6;
 
 const INTERACTION_COPY = {
   "loading-model": {
@@ -353,16 +357,23 @@ function App() {
     const thumbTip = lm[4];
     const indexTip = lm[8];
     const pinchRatio = getSmoothedPinchRatio(getPinchDistanceRatio(lm));
+    // Once ink is down, be much slower to lift it so strokes survive weak angles.
+    const releaseRatio = isDrawingRef.current
+      ? DRAWING_RELEASE_RATIO
+      : PINCH_OFF_RATIO;
+    const releaseGraceFrames = isDrawingRef.current
+      ? DRAWING_RELEASE_GRACE_FRAMES
+      : PINCH_RELEASE_GRACE_FRAMES;
 
     if (!isPinchingRef.current && pinchRatio < PINCH_ON_RATIO) {
       pinchReleaseFramesRef.current = 0;
       isPinchingRef.current = true;
     }
 
-    if (isPinchingRef.current && pinchRatio > PINCH_OFF_RATIO) {
+    if (isPinchingRef.current && pinchRatio > releaseRatio) {
       pinchReleaseFramesRef.current += 1;
 
-      if (pinchReleaseFramesRef.current >= PINCH_RELEASE_GRACE_FRAMES) {
+      if (pinchReleaseFramesRef.current >= releaseGraceFrames) {
         pinchReleaseFramesRef.current = 0;
         isPinchingRef.current = false;
       }
@@ -418,9 +429,7 @@ function App() {
 
   useEffect(() => {
     async function init() {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm",
-      );
+      const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
 
       const handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: MODEL_URL },
